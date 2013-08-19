@@ -28,6 +28,7 @@
    - Add support to drive LCD using 595 shift register (reduces pinout consumption, cheap) on both 8 bits and 4 bits mode
    - Add support to drive LCD using MCP23017/MCP23008 (reduces pinout consumption, more expensive but allow reading inputs)
      on both 8 bits and 4 bits mode
+   - Add support for character generation
  
  Copyright (c) 2013, Cristo Saulo Bolaños Trujillo <cbolanos@gmail.com>
  All rights reserved.
