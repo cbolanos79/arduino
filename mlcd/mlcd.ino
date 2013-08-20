@@ -11,18 +11,18 @@
   2 VCC
   3 VEE
   4 RS
-  5 R/W
+  5 R/W // Connect to ground
   6 E
   7 DB0
   8 DB1
   9 DB2
  10 DB3
  11 DB4
- 12 DB5
+ 12 DB5 // DB5 - DB7 are not used on 4 bits mode
  13 DB6
  14 DB7
- 15 LED+
- 16 LED-
+ 15 LED+ // May vary
+ 16 LED- // May vary
  
  TODO:
    - Add support to drive LCD using 595 shift register (reduces pinout consumption, cheap) on both 8 bits and 4 bits mode
@@ -33,8 +33,9 @@
  CHANGELOG
    v0.1 Initial release supporting basic 8 bits mode and major instruction set except for custom character generator
    v0.2 Support for 4 bits mode
-   v0.3 Added functions to display on/off, cursor on/off, blink cursor on/off 
-   
+   v0.3 Added functions to display on/off, cursor on/off, blink cursor on/off. 
+        Fixed error using clear_display()
+        Clear display on init()
    
  Copyright (c) 2013, Cristo Saulo Bolaños Trujillo <cbolanos@gmail.com>
  All rights reserved.
@@ -223,29 +224,6 @@ void HD44780_blink_off(struct lcd_status *lcd) {
   // Mask control bits so get only 3 LSB bits (00000111): blink, cursor and display
   HD44780_write_instruction(DISPLAY_BITS(lcd->control_bits));  
 }
-
-
-/*
-void HD44780_display_control(bool disp, bool curs, bool blinking) {
-  
-  int data = 0x08; // D = 0, C = 0, B = 0
-  
-  // Set D value (display on = 1, display off = 0)
-  if (disp)
-    data |= 0x04;
-  
-  // Set C value (cursor on = 1, cursor off = 0)
-  if (curs)
-    data |= 0x02;
-    
-  // Set B value (blinking on = 1, blinking off = 0)
-  if (blinking)
-    data |= 0x01;
-  
-  HD44780_write_instruction(data);
-}*/
-
-
 
 void HD44780_clear_display() {
   HD44780_write_instruction(0x01);
