@@ -1,5 +1,5 @@
 /*
- Just another lcd library for arduino.
+ Just another LCD HD44780 based sketch for arduino.
  
  This sketch is intented for reduced learning purposes and reducing
  memory consumption so may be usable on a tiny45/tiny85 uC
@@ -28,8 +28,14 @@
    - Add support to drive LCD using 595 shift register (reduces pinout consumption, cheap) on both 8 bits and 4 bits mode
    - Add support to drive LCD using MCP23017/MCP23008 (reduces pinout consumption, more expensive but allow reading inputs)
      on both 8 bits and 4 bits mode
-   - Add support for character generation
  
+ 
+ CHANGELOG
+   v0.1 Initial release supporting basic 8 bits mode and major instruction set except for custom character generator
+   v0.2 Support for 4 bits mode
+   v0.3 Added functions to display on/off, cursor on/off, blink cursor on/off 
+   
+   
  Copyright (c) 2013, Cristo Saulo Bolaños Trujillo <cbolanos@gmail.com>
  All rights reserved.
 
@@ -64,6 +70,8 @@ void HD44780_write(int rs, int data, bool one_write=false);
 #define LCD_DECREMENT 0
 #define LCD_SHIFT 1
 #define LCD_NO_SHIFT 0
+#define LCD_FONT_5x8 8
+#define LCD_FONT_5x10 10
 
 // Enable 8 bits or 4 bits operating mode
 //#define LCD_8BITS
@@ -90,8 +98,27 @@ void HD44780_write(int rs, int data, bool one_write=false);
   #define DB6 10
   #define DB7 11
 #endif
-  
-void HD44780_init(int lines) {
+
+#define DISPLAY_BITS(x) (0x8|(0x7&(x)))
+
+struct lcd_status {
+  // Instead using individual var for each control bit, store them into a 
+  // byte array to reduce memory consumption.
+  // Individual vars would require 32 bytes of SRAM: 8 bytes * 4 vars = 32 bytes
+  // Using just a byte, can fit 8 control bits (a bit more complex to drive)
+  byte control_bits;
+  /*
+     Bits order (LSB first):
+     
+     Blink cursor: 1 blink, 0 not blink
+     Cursor on/off: 1 on, 0 off
+     Display on/off: 1 on, 0 off
+     Cursor move direction: 1 increment, 0 decrement
+  */
+                     
+} lcd;
+
+void HD44780_init(int lines, int font, struct lcd_status *lcd) {
   delay(25);
   
   pinMode(RS, OUTPUT);
@@ -107,12 +134,15 @@ void HD44780_init(int lines) {
   pinMode(DB5, OUTPUT);
   pinMode(DB6, OUTPUT);
   pinMode(DB7, OUTPUT);
+  
+  lcd->control_bits = 0x0;
 
-  HD44780_function_set(2, 8);
-  HD44780_display_control(true, false, false);
+  HD44780_function_set(lines, font);
+  HD44780_display_on(lcd);
   HD44780_entry_mode(LCD_INCREMENT, LCD_NO_SHIFT);
   HD44780_cursor_display_shift(0, 0);
-  
+  HD44780_clear_display();
+
 }
 
 void HD44780_function_set(int lines, int char_font) {
@@ -145,6 +175,57 @@ void HD44780_function_set(int lines, int char_font) {
   #endif
 }
 
+void HD44780_display_on(struct lcd_status *lcd) {
+  // Set display bit to 1 (0000 X1XX)
+  lcd->control_bits |= 0x04;
+  
+  // Mask control bits so get only 3 LSB bits (00000111): blink, cursor and display
+  HD44780_write_instruction(DISPLAY_BITS(lcd->control_bits));
+  
+}
+
+void HD44780_display_off(struct lcd_status *lcd) {
+  // Set display bit to 0 (0000 X0XX)
+  lcd->control_bits &= 0x0B;
+  
+  // Mask control bits so get only 3 LSB bits (00000111): blink, cursor and display
+  HD44780_write_instruction(DISPLAY_BITS(lcd->control_bits));
+}
+
+void HD44780_cursor_on(struct lcd_status *lcd) {
+  // Set cursor bit to 1 (0000 XX1X)
+  lcd->control_bits |= 0x02;
+  
+  // Mask control bits so get only 3 LSB bits (00000111): blink, cursor and display
+  HD44780_write_instruction(DISPLAY_BITS(lcd->control_bits));  
+}
+
+void HD44780_cursor_off(struct lcd_status *lcd) {
+  // Set cursor bit to 0 (0000 XX0X)
+  lcd->control_bits &= 0x0D;
+  
+  // Mask control bits so get only 3 LSB bits (00000111): blink, cursor and display
+  HD44780_write_instruction(DISPLAY_BITS(lcd->control_bits));  
+}
+
+void HD44780_blink_on(struct lcd_status *lcd) {
+  // Set cursor bit to 1 (0000 XXX1)
+  lcd->control_bits |= 0x01;
+  
+  // Mask control bits so get only 3 LSB bits (00000111): blink, cursor and display
+  HD44780_write_instruction(DISPLAY_BITS(lcd->control_bits));  
+}
+
+void HD44780_blink_off(struct lcd_status *lcd) {
+  // Set cursor bit to 0 (0000 XXX0)
+  lcd->control_bits &= 0x0E;
+  
+  // Mask control bits so get only 3 LSB bits (00000111): blink, cursor and display
+  HD44780_write_instruction(DISPLAY_BITS(lcd->control_bits));  
+}
+
+
+/*
 void HD44780_display_control(bool disp, bool curs, bool blinking) {
   
   int data = 0x08; // D = 0, C = 0, B = 0
@@ -162,10 +243,13 @@ void HD44780_display_control(bool disp, bool curs, bool blinking) {
     data |= 0x01;
   
   HD44780_write_instruction(data);
-}
+}*/
+
+
 
 void HD44780_clear_display() {
-  HD44780_write_instruction(0x01); 
+  HD44780_write_instruction(0x01);
+  delay(2);
 }
 
 void HD44780_entry_mode(int dir, bool shift) {
@@ -286,17 +370,28 @@ void HD44780_write(int rs, int data, bool one_write) {
 
 void setup() {
   // Init lcd using 2 lines
-  HD44780_init(2);
-}
+  HD44780_init(2, LCD_FONT_5x8, &lcd);
 
-void loop() {  
+  HD44780_set_cursor(1,1);
   HD44780_write_string("Hello world", 11);
-  delay(1000);
   HD44780_set_cursor(2,1);
   HD44780_write_string("See you!", 8);
+}
+
+void loop() {
+  HD44780_blink_on(&lcd);
   delay(1000);
-  HD44780_clear_display();
+  HD44780_blink_off(&lcd);
   delay(1000);
+  HD44780_cursor_on(&lcd);
+  delay(1000);
+  HD44780_cursor_off(&lcd);
+  delay(1000);
+  HD44780_display_off(&lcd);
+  delay(1000);
+  HD44780_display_on(&lcd);
+  delay(1000);
+  
 }
 
 
