@@ -105,8 +105,8 @@ Place this line on the code to enable the latched mode:
     *    Q7S -> Not used
        
 #TODO
-   - Add support to drive LCD using 595 shift register (reduces pinout consumption, cheap) on both 8 bits and 4 bits mode.
    - Add support to drive LCD using MCP23017/MCP23008 (reduces pinout consumption, more expensive but allow reading inputs) on both 8 bits and 4 bits mode 
+   - Write a library instead a sketch
  
 #CHANGELOG
 *    v0.1 Initial release supporting basic 8 bits mode and major instruction set except for custom character generator
