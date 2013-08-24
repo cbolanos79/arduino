@@ -1,71 +1,40 @@
 /*
- Just another LCD HD44780 based sketch for arduino.
- 
- This sketch is intented for reduced learning purposes and reducing
- memory consumption so may be usable on a tiny45/tiny85 uC
- Instead using classes and library use a procedures and preprocessor directives
-  
- Typical LCD pinout (15 and 16 may vary):
- 
-  1 VSS
-  2 VCC
-  3 VEE
-  4 RS
-  5 R/W // Connect to ground
-  6 E
-  7 DB0
-  8 DB1
-  9 DB2
- 10 DB3
- 11 DB4
- 12 DB5 // DB5 - DB7 are not used on 4 bits mode
- 13 DB6
- 14 DB7
- 15 LED+ // May vary
- 16 LED- // May vary
- 
- TODO:
-   - Add support to drive LCD using 595 shift register (reduces pinout consumption, cheap) on both 8 bits and 4 bits mode
-   - Add support to drive LCD using MCP23017/MCP23008 (reduces pinout consumption, more expensive but allow reading inputs)
-     on both 8 bits and 4 bits mode
- 
- 
- CHANGELOG
-   v0.1 Initial release supporting basic 8 bits mode and major instruction set except for custom character generator
-   v0.2 Support for 4 bits mode
-   v0.3 Added functions to display on/off, cursor on/off, blink cursor on/off. 
-        Fixed error using clear_display()
-        Clear display on init()
-   
- Copyright (c) 2013, Cristo Saulo Bolaños Trujillo <cbolanos@gmail.com>
- All rights reserved.
+  Copyright (c) 2013, Cristo Saulo Bolaños Trujillo <cbolanos@gmail.com>
+  All rights reserved.
 
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions are met:
-    * Redistributions of source code must retain the above copyright
-      notice, this list of conditions and the following disclaimer.
-    * Redistributions in binary form must reproduce the above copyright
-      notice, this list of conditions and the following disclaimer in the
-      documentation and/or other materials provided with the distribution.
-    * Neither the name of the <organization> nor the
-      names of its contributors may be used to endorse or promote products
-      derived from this software without specific prior written permission.
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are met:
+     * Redistributions of source code must retain the above copyright
+       notice, this list of conditions and the following disclaimer.
+     * Redistributions in binary form must reproduce the above copyright
+       notice, this list of conditions and the following disclaimer in the
+       documentation and/or other materials provided with the distribution.
+     * Neither the name of the <organization> nor the
+       names of its contributors may be used to endorse or promote products
+       derived from this software without specific prior written permission.
 
- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
- DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+  DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
+  DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
 void HD44780_write_instruction(int data, bool one_read=false);
 void HD44780_write(int rs, int data, bool one_write=false);
+
+// Enable 8 bits or 4 bits operating mode
+#define LCD_8BITS
+//#define LCD_4BITS
+
+// Enable latched mode using 595 shift register
+//#define LATCHED
 
 #define LCD_INCREMENT 1
 #define LCD_DECREMENT 0
@@ -74,9 +43,11 @@ void HD44780_write(int rs, int data, bool one_write=false);
 #define LCD_FONT_5x8 8
 #define LCD_FONT_5x10 10
 
-// Enable 8 bits or 4 bits operating mode
-//#define LCD_8BITS
-#define LCD_4BITS
+#ifdef LATCHED
+  #define LATCH_LATCH 16
+  #define LATCH_CLOCK 14
+  #define LATCH_DATA 15
+#endif
 
 #ifdef LCD_8BITS
   #define RS 2
@@ -100,6 +71,7 @@ void HD44780_write(int rs, int data, bool one_write=false);
   #define DB7 11
 #endif
 
+// Mask for display command
 #define DISPLAY_BITS(x) (0x8|(0x7&(x)))
 
 struct lcd_status {
@@ -126,11 +98,21 @@ void HD44780_init(int lines, int font, struct lcd_status *lcd) {
   pinMode(E, OUTPUT);
   
   #ifdef LCD_8BITS
-    pinMode(DB0, OUTPUT);
-    pinMode(DB1, OUTPUT);
-    pinMode(DB2, OUTPUT);
-    pinMode(DB3, OUTPUT);
+    #ifdef LATCHED
+      pinMode(LATCH_LATCH, OUTPUT);
+      pinMode(LATCH_CLOCK, OUTPUT);
+      pinMode(LATCH_DATA, OUTPUT);
+    #endif
+    
+    #ifndef LATCHED
+      pinMode(DB0, OUTPUT);
+      pinMode(DB1, OUTPUT);
+      pinMode(DB2, OUTPUT);
+      pinMode(DB3, OUTPUT);
+    #endif
   #endif
+  
+  
   pinMode(DB4, OUTPUT);
   pinMode(DB5, OUTPUT);
   pinMode(DB6, OUTPUT);
@@ -295,23 +277,61 @@ void HD44780_write_data(int data) {
 }
 
 void HD44780_write(int rs, int data, bool one_write) {
-  digitalWrite(RS, rs);
+  #ifndef LATCHED
+    digitalWrite(RS, rs);
+  #endif
   
   #ifdef LCD_8BITS
-    digitalWrite(DB0, data&0x1 ? HIGH: LOW);
-    digitalWrite(DB1, data&0x2 ? HIGH: LOW);
-    digitalWrite(DB2, data&0x4 ? HIGH: LOW);
-    digitalWrite(DB3, data&0x8 ? HIGH: LOW);
-    digitalWrite(DB4, data&0x10 ? HIGH: LOW);
-    digitalWrite(DB5, data&0x20 ? HIGH: LOW);
-    digitalWrite(DB6, data&0x40 ? HIGH: LOW);
-    digitalWrite(DB7, data&0x80 ? HIGH: LOW);
   
-    // Clock pulse of E signal HIGH->LOW
-    __asm__("nop\n\t"); 
-    digitalWrite(E, HIGH);
-    __asm__("nop\n\t"); 
-    digitalWrite(E, LOW);  
+    #ifdef LATCHED
+      digitalWrite(LATCH_LATCH, LOW);
+
+      /*
+        Using 595 shift register on 8 bits mode, requires 2 IC's chained, so
+        must send data on two steps: 
+        RS | ENABLE | 000000
+        DATA0 ... DATA7 
+        
+        DATA needs 8 bits so it takes a full IC
+        
+        ENABLE is set to HIGH
+      */
+      
+      shiftOut(LATCH_DATA, LATCH_CLOCK, MSBFIRST, rs | 0x2);  
+      shiftOut(LATCH_DATA, LATCH_CLOCK, MSBFIRST, data);  
+      digitalWrite(LATCH_LATCH, HIGH);
+      __asm__("nop\n\t");
+      
+      digitalWrite(LATCH_LATCH, LOW);
+
+      /*
+        Set ENABLE signal to LOW, so send only RS signal data to shift register:
+        0 RS 0 ...0
+      */
+      shiftOut(LATCH_DATA, LATCH_CLOCK, MSBFIRST, rs);  
+      shiftOut(LATCH_DATA, LATCH_CLOCK, MSBFIRST, 0);  
+      digitalWrite(LATCH_LATCH, HIGH);
+      __asm__("nop\n\t");
+
+    #endif
+    
+    #ifndef LATCHED
+      digitalWrite(DB0, data&0x1 ? HIGH: LOW);
+      digitalWrite(DB1, data&0x2 ? HIGH: LOW);
+      digitalWrite(DB2, data&0x4 ? HIGH: LOW);
+      digitalWrite(DB3, data&0x8 ? HIGH: LOW);
+      digitalWrite(DB4, data&0x10 ? HIGH: LOW);
+      digitalWrite(DB5, data&0x20 ? HIGH: LOW);
+      digitalWrite(DB6, data&0x40 ? HIGH: LOW);
+      digitalWrite(DB7, data&0x80 ? HIGH: LOW);
+  
+      // Clock pulse of E signal HIGH->LOW
+      __asm__("nop\n\t"); 
+     digitalWrite(E, HIGH);
+      __asm__("nop\n\t"); 
+      digitalWrite(E, LOW);
+    #endif
+    
   #endif
   
   #ifdef LCD_4BITS
