@@ -6,22 +6,22 @@ memory consumption so may be usable on a tiny45/tiny85 uC
 Instead using classes and library use a procedures and preprocessor directives
   
 ##Typical LCD pinout:
-  1 VSS
-  2 VCC
-  3 VEE
-  4 RS
-  5 R/W // Connect to ground
-  6 E
-  7 DB0
-  8 DB1
-  9 DB2
- 10 DB3
- 11 DB4
- 12 DB5 // DB5 - DB7 are not used on 4 bits mode
- 13 DB6
- 14 DB7
- 15 LED+ // May vary
- 16 LED- // May vary
+*    1 VSS
+*    2 VCC
+*    3 VEE
+*    4 RS
+*    5 R/W // Connect to ground
+*    6 E
+*    7 DB0
+*    8 DB1
+*    9 DB2
+*   10 DB3 // DB0 - DB3 are not used on 4 bits mode
+*   11 DB4
+*   12 DB5 
+*   13 DB6
+*   14 DB7
+*   15 LED+ // May vary
+*   16 LED- // May vary
  
 ###8 bits mode
 Just place this line on the code
@@ -79,6 +79,31 @@ Shift registers pinout
     *    Q0 -> RS
     *    Q1 -> Enable
 
+###4 bits
+  *Must use only one latch
+  
+Place this line on the code to enable the latched mode:
+
+    #define LATCHED
+
+*    Shift register
+    *    DS -> Arduino LATCH_DATA
+    *    SHCP -> Arduino LATCH_CLOCK
+    *    STCP -> Arduino LATCH_LATCH
+    *    VCC -> +5V
+    *    GND -> GND
+    *    MR -> +5V
+    *    OE -> GND
+    *    Q0 -> D4
+    *    Q1 -> D5
+    *    Q2 -> D6
+    *    Q3 -> D7
+    *    Q4 -> RS
+    *    Q5 -> ENABLE
+    *    Q6 -> Not used
+    *    Q7 -> Not used
+    *    Q7S -> Not used
+       
 #TODO
    - Add support to drive LCD using 595 shift register (reduces pinout consumption, cheap) on both 8 bits and 4 bits mode.
    - Add support to drive LCD using MCP23017/MCP23008 (reduces pinout consumption, more expensive but allow reading inputs) on both 8 bits and 4 bits mode 
@@ -90,6 +115,7 @@ Shift registers pinout
     *    Fixed error using clear_display()
     *    Clear display on init()
 *    v0.4 Support for 8 bits mode latched (595 shift register)
+*    v0.41 Support for 4 bits mode latched (595 shift register)
 
 #Licence
  

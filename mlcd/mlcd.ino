@@ -30,11 +30,11 @@ void HD44780_write_instruction(int data, bool one_read=false);
 void HD44780_write(int rs, int data, bool one_write=false);
 
 // Enable 8 bits or 4 bits operating mode
-#define LCD_8BITS
-//#define LCD_4BITS
+//#define LCD_8BITS
+#define LCD_4BITS
 
 // Enable latched mode using 595 shift register
-//#define LATCHED
+#define LATCHED
 
 #define LCD_INCREMENT 1
 #define LCD_DECREMENT 0
@@ -93,31 +93,32 @@ struct lcd_status {
 
 void HD44780_init(int lines, int font, struct lcd_status *lcd) {
   delay(25);
+  pinMode(2, OUTPUT);
+  pinMode(3, OUTPUT);
+  digitalWrite(3, LOW);
   
-  pinMode(RS, OUTPUT);
-  pinMode(E, OUTPUT);
+  #ifdef LATCHED
+    pinMode(LATCH_LATCH, OUTPUT);
+    pinMode(LATCH_CLOCK, OUTPUT);
+    pinMode(LATCH_DATA, OUTPUT);
+  #endif
   
-  #ifdef LCD_8BITS
-    #ifdef LATCHED
-      pinMode(LATCH_LATCH, OUTPUT);
-      pinMode(LATCH_CLOCK, OUTPUT);
-      pinMode(LATCH_DATA, OUTPUT);
-    #endif
+  #ifndef LATCHED
+    pinMode(RS, OUTPUT);
+    pinMode(E, OUTPUT);
     
-    #ifndef LATCHED
+    #ifdef LCD_8BITS
       pinMode(DB0, OUTPUT);
       pinMode(DB1, OUTPUT);
       pinMode(DB2, OUTPUT);
       pinMode(DB3, OUTPUT);
     #endif
+    pinMode(DB4, OUTPUT);
+    pinMode(DB5, OUTPUT);
+    pinMode(DB6, OUTPUT);
+    pinMode(DB7, OUTPUT);
   #endif
-  
-  
-  pinMode(DB4, OUTPUT);
-  pinMode(DB5, OUTPUT);
-  pinMode(DB6, OUTPUT);
-  pinMode(DB7, OUTPUT);
-  
+
   lcd->control_bits = 0x0;
 
   HD44780_function_set(lines, font);
@@ -301,7 +302,6 @@ void HD44780_write(int rs, int data, bool one_write) {
       shiftOut(LATCH_DATA, LATCH_CLOCK, MSBFIRST, data);  
       digitalWrite(LATCH_LATCH, HIGH);
       __asm__("nop\n\t");
-      
       digitalWrite(LATCH_LATCH, LOW);
 
       /*
@@ -336,34 +336,103 @@ void HD44780_write(int rs, int data, bool one_write) {
   
   #ifdef LCD_4BITS
   
-    // On 4 bits operation mode, must load first 4 MSB and after 4 LSB
-    digitalWrite(DB4, data&0x10 ? HIGH: LOW);
-    digitalWrite(DB5, data&0x20 ? HIGH: LOW);
-    digitalWrite(DB6, data&0x40 ? HIGH: LOW);
-    digitalWrite(DB7, data&0x80 ? HIGH: LOW);
+    #ifdef LATCHED
+      digitalWrite(LATCH_LATCH, LOW);
+      //digitalWrite(2, rs);
+      __asm__("nop\n\t");
+      __asm__("nop\n\t");
+      int rs_bit;
+      
+      rs_bit = rs == HIGH?1:0;
+      
+      /*
+        Using 595 shift register on 4 bits mode, just need one shift register but must send data four times:
+        
+        RS | ENABLE HIGH | MSB data 4 bits (DATA4 ... DATA7)
+        RS | ENABLE LOW  | 000000 (doesn't matter)
+        RS | ENABLE HIGH | LSB data 4 bits (DATA0 ... DATA3)
+        RS | ENABLE LOW  | 000000 (doesn't matter)
+      */
+ 
+      // RS | ENABLE HIGH | MSB data (DATA4 ... DATA7)
+      shiftOut(LATCH_DATA, LATCH_CLOCK, MSBFIRST, rs_bit | 0x2 | ((data & 0xF0)>>2)); 
+      
+      digitalWrite(LATCH_LATCH, HIGH);
+      __asm__("nop\n\t");
+      digitalWrite(LATCH_LATCH, LOW);
+      __asm__("nop\n\t");
+      delay(10);
+      digitalWrite(3, HIGH);
+      __asm__("nop\n\t");
+      digitalWrite(3, LOW);
 
-    // Clock pulse of E signal HIGH->LOW
-    __asm__("nop\n\t"); 
-    digitalWrite(E, HIGH);
-    __asm__("nop\n\t"); 
-    digitalWrite(E, LOW);
-    delay(1);  
-    
-    // Return if only write one instruction (required for function set on 4 bits operation mode)
-    if (one_write)
-      return;
+      // RS | ENABLE LOW | 000000
+      
+      shiftOut(LATCH_DATA, LATCH_CLOCK, MSBFIRST, rs_bit);  
+      digitalWrite(LATCH_LATCH, HIGH);
+      __asm__("nop\n\t");
+      digitalWrite(LATCH_LATCH, LOW);
+      __asm__("nop\n\t");
+      
+      
+      // Return if only write one instruction (required for function set on 4 bits operation mode)
+      if (one_write)
+        return;
 
-    digitalWrite(DB4, data&0x1 ? HIGH: LOW);
-    digitalWrite(DB5, data&0x2 ? HIGH: LOW);
-    digitalWrite(DB6, data&0x4 ? HIGH: LOW);
-    digitalWrite(DB7, data&0x8 ? HIGH: LOW);
+      // RS | ENABLE HIGH | LSB data (DATA0 ... DATA3)
+      shiftOut(LATCH_DATA, LATCH_CLOCK, MSBFIRST, rs | 0x2 | ((data & 0x0F)<<2));  
+      //shiftOut(LATCH_DATA, LATCH_CLOCK, MSBFIRST, (data & 0x0F)<<2);  
+      
+      digitalWrite(LATCH_LATCH, HIGH);
+      __asm__("nop\n\t");
+      digitalWrite(LATCH_LATCH, LOW);
+      __asm__("nop\n\t");
+      delay(10);
+      digitalWrite(3, HIGH);
+      __asm__("nop\n\t");
+      digitalWrite(3, LOW);
+
+
+      // RS | ENABLE LOW | 000000
+      shiftOut(LATCH_DATA, LATCH_CLOCK, MSBFIRST, rs);  
+      digitalWrite(LATCH_LATCH, HIGH);
+      __asm__("nop\n\t");
+      digitalWrite(LATCH_LATCH, LOW);
+      __asm__("nop\n\t");
+
+
+    #endif
     
-    // Clock pulse of E signal HIGH->LOW
-    __asm__("nop\n\t"); 
-    digitalWrite(E, HIGH);
-    __asm__("nop\n\t"); 
-    digitalWrite(E, LOW);  
-  #endif   
+    #ifndef LATCHED
+      // On 4 bits operation mode, must load first 4 MSB and after 4 LSB
+      digitalWrite(DB4, data&0x10 ? HIGH: LOW);
+      digitalWrite(DB5, data&0x20 ? HIGH: LOW);
+      digitalWrite(DB6, data&0x40 ? HIGH: LOW);
+      digitalWrite(DB7, data&0x80 ? HIGH: LOW);
+
+      // Clock pulse of E signal HIGH->LOW
+      __asm__("nop\n\t"); 
+      digitalWrite(E, HIGH);
+      __asm__("nop\n\t"); 
+      digitalWrite(E, LOW);
+      delay(1);  
+    
+      // Return if only write one instruction (required for function set on 4 bits operation mode)
+      if (one_write)
+        return;
+
+      digitalWrite(DB4, data&0x1 ? HIGH: LOW);
+      digitalWrite(DB5, data&0x2 ? HIGH: LOW);
+      digitalWrite(DB6, data&0x4 ? HIGH: LOW);
+      digitalWrite(DB7, data&0x8 ? HIGH: LOW);
+    
+      // Clock pulse of E signal HIGH->LOW
+      __asm__("nop\n\t"); 
+      digitalWrite(E, HIGH);
+      __asm__("nop\n\t"); 
+      digitalWrite(E, LOW);  
+    #endif   
+  #endif
 }
 
 void setup() {
