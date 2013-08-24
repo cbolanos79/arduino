@@ -94,12 +94,12 @@ Place this line on the code to enable the latched mode:
     *    GND -> GND
     *    MR -> +5V
     *    OE -> GND
-    *    Q0 -> D4
-    *    Q1 -> D5
-    *    Q2 -> D6
-    *    Q3 -> D7
-    *    Q4 -> RS
-    *    Q5 -> ENABLE
+    *    Q0 -> RS
+    *    Q1 -> E
+    *    Q2 -> D4
+    *    Q3 -> D5
+    *    Q4 -> D6
+    *    Q5 -> D7
     *    Q6 -> Not used
     *    Q7 -> Not used
     *    Q7S -> Not used
